@@ -1,0 +1,15 @@
+export const firebaseConfig = {
+    apiKey: "AIzaSyA8iSMvFCiEUBD3OO-WghZwy3n6Ii9NnEs",
+    authDomain: "johnny-g-s-pool-service.firebaseapp.com",
+    projectId: "johnny-g-s-pool-service",
+    storageBucket: "johnny-g-s-pool-service.firebasestorage.app",
+    messagingSenderId: "331841917389",
+    appId: "1:331841917389:web:f42bd1a135fd70cacd3484"
+};
+
+export const businessInfo = {
+    name: "Johnny G's Pool Service, Tile & Metal",
+    city: "Edinburg, TX",
+    phone: "",
+    email: "garciajonny956@gmail.com"
+};
