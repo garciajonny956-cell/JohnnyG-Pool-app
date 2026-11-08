@@ -1,0 +1,104 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helper functions ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Check if the logged-in user is the owner (Johnny)
+    function isOwner() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+    }
+
+    // The signed-in user's email, lowercased, only if they verified it.
+    function verified() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    // ---------- Users: role profiles ----------
+    // Customers can read their own profile. They can create it ONCE, only with
+    // role 'customer', only for their own verified email, and only if Johnny
+    // already added a customer record for that email. They can never change it.
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if verified()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['role', 'email', 'name', 'createdAt'])
+        && request.resource.data.role == 'customer'
+        && request.resource.data.email == myEmail()
+        && exists(/databases/$(database)/documents/customers/$(myEmail()));
+      allow read, write: if isOwner();
+    }
+
+    // ---------- Customers: records Johnny creates (doc id = lowercase email) ----------
+    match /customers/{email} {
+      allow read: if verified() && email == myEmail();
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner()
+        && request.resource.data.email == email
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
+    }
+
+    // ---------- Service Logs ----------
+    // Customers see only their logs, and may only flip "I've paid" on an unpaid log.
+    // Owner manages all.
+    match /serviceLogs/{logId} {
+      function validLog(d) {
+        return d.customerEmail is string
+          && d.customerId == d.customerEmail
+          && d.date is string
+          && d.serviceType is string
+          && d.amount is number && d.amount >= 0
+          && d.paid is bool;
+      }
+      allow read: if verified() && resource.data.customerEmail == myEmail();
+      allow update: if verified()
+        && resource.data.customerEmail == myEmail()
+        && resource.data.paid == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerReportedPaid', 'customerReportedAt'])
+        && request.resource.data.customerReportedPaid == true
+        && request.resource.data.customerReportedAt == request.time;
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && validLog(request.resource.data);
+    }
+
+    // ---------- Service Requests ----------
+    // Customers create and read only their own; owner full access.
+    match /serviceRequests/{requestId} {
+      allow read: if verified() && resource.data.customerEmail == myEmail();
+      allow create: if verified()
+        && exists(/databases/$(database)/documents/customers/$(myEmail()))
+        && request.resource.data.keys().hasOnly(['customerId', 'customerEmail', 'customerUid', 'customerName',
+                                                 'preferredDate', 'serviceType', 'notes', 'status', 'createdAt'])
+        && request.resource.data.customerEmail == myEmail()
+        && request.resource.data.customerId == myEmail()
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.preferredDate is string
+        && request.resource.data.serviceType is string && request.resource.data.serviceType.size() <= 50
+        && request.resource.data.notes is string && request.resource.data.notes.size() <= 1000
+        && request.resource.data.customerName is string && request.resource.data.customerName.size() <= 200
+        && request.resource.data.createdAt == request.time;
+      allow read, write: if isOwner();
+    }
+
+    // ---------- Settings (payment handles) ----------
+    // Any signed-in user can read; only the owner can write.
+    match /settings/{settingId} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    // Everything else is locked by default (no matching rule = denied).
+  }
+}

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Johnny G's Pool Service, Tile &amp; Metal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Johnny G's Pool Service, Tile &amp; Metal</h1>
+        <button id="logout-btn" style="display: none;">Log Out</button>
+    </header>
+
+    <main>
+        <!-- Shown when firebase-config.js still has placeholder values -->
+        <div id="config-warning" class="notice warning" style="display: none;">
+            This app isn't connected to Firebase yet. Open <strong>firebase-config.js</strong>
+            and paste your Firebase settings (see SETUP.md, step 4).
+        </div>
+
+        <!-- Global status / loading -->
+        <div id="global-status" class="notice" style="display: none;" role="status" aria-live="polite"></div>
+
+        <!-- Login Section -->
+        <section id="login-section" style="display: none;">
+            <h2>Portal Login</h2>
+            <form id="login-form">
+                <input type="email" id="email" placeholder="Email Address" autocomplete="email" required>
+                <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+                <button type="submit">Log In</button>
+            </form>
+            <p id="login-error" class="error" role="alert"></p>
+            <p class="small-links">
+                <a href="#" id="show-signup">New customer? Create account</a>
+                <span aria-hidden="true">·</span>
+                <a href="#" id="show-reset">Forgot password?</a>
+            </p>
+        </section>
+
+        <!-- Create Account Section -->
+        <section id="signup-section" style="display: none;">
+            <h2>Create Your Customer Account</h2>
+            <p class="muted">Use the same email address you gave Johnny. Your account only works once Johnny has added you as a customer.</p>
+            <form id="signup-form">
+                <input type="text" id="signup-name" placeholder="Your Name" autocomplete="name" required>
+                <input type="email" id="signup-email" placeholder="Email Address" autocomplete="email" required>
+                <input type="password" id="signup-password" placeholder="Password (at least 6 characters)" autocomplete="new-password" minlength="6" required>
+                <input type="password" id="signup-password2" placeholder="Confirm Password" autocomplete="new-password" minlength="6" required>
+                <button type="submit">Create Account</button>
+            </form>
+            <p id="signup-error" class="error" role="alert"></p>
+            <p class="small-links"><a href="#" class="back-to-login">Back to login</a></p>
+        </section>
+
+        <!-- Forgot Password Section -->
+        <section id="reset-section" style="display: none;">
+            <h2>Reset Your Password</h2>
+            <p class="muted">Enter your email and we'll send you a link to choose a new password.</p>
+            <form id="reset-form">
+                <input type="email" id="reset-email" placeholder="Email Address" autocomplete="email" required>
+                <button type="submit">Send Reset Link</button>
+            </form>
+            <p id="reset-message" class="success" role="status"></p>
+            <p id="reset-error" class="error" role="alert"></p>
+            <p class="small-links"><a href="#" class="back-to-login">Back to login</a></p>
+        </section>
+
+        <!-- Verify Email Section -->
+        <section id="verify-section" style="display: none;">
+            <h2>Check Your Email</h2>
+            <p>We sent a verification link to <strong id="verify-email-address"></strong>.
+               Click the link in that email, then come back and tap the button below.</p>
+            <p class="muted">Don't see it? Check your spam or junk folder.</p>
+            <div class="button-row">
+                <button id="verify-done-btn">I've Verified My Email</button>
+                <button id="verify-resend-btn" class="secondary">Resend Email</button>
+            </div>
+            <p id="verify-message" class="success" role="status"></p>
+            <p id="verify-error" class="error" role="alert"></p>
+        </section>
+
+        <!-- Customer Portal -->
+        <section id="customer-portal" style="display: none;">
+            <h2>Customer Portal</h2>
+            <p>Welcome back<span id="customer-name-greeting"></span>! Here are your latest service logs and invoices.</p>
+            <div id="customer-summary" class="summary-cards"></div>
+
+            <div class="section-header">
+                <h3>Request a Service Visit</h3>
+                <button id="toggle-request-form" class="secondary">New Request</button>
+            </div>
+            <form id="request-form" class="card-form" style="display: none;">
+                <label>Preferred date
+                    <input type="date" id="req-date" required>
+                </label>
+                <label>Service type
+                    <select id="req-type" required>
+                        <option value="Cleaning">Cleaning</option>
+                        <option value="Chemical Balance">Chemical Balance</option>
+                        <option value="Tile">Tile</option>
+                        <option value="Metal / Repair">Metal / Repair</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </label>
+                <label>Notes (optional)
+                    <textarea id="req-notes" rows="3" maxlength="1000" placeholder="Anything Johnny should know?"></textarea>
+                </label>
+                <div class="button-row">
+                    <button type="submit">Send Request</button>
+                    <button type="button" class="secondary" id="cancel-request">Cancel</button>
+                </div>
+                <p id="request-error" class="error" role="alert"></p>
+            </form>
+            <div id="customer-requests"></div>
+
+            <h3>Service History &amp; Invoices</h3>
+            <div id="customer-data">
+                <!-- Data populated by Firebase -->
+            </div>
+        </section>
+
+        <!-- Owner Dashboard -->
+        <section id="owner-dashboard" style="display: none;">
+            <h2>Owner Dashboard</h2>
+            <p>Welcome, Johnny. Manage your routes, clients, and receipts here.</p>
+            <div class="dashboard-controls">
+                <button id="add-service-log">Log New Service</button>
+                <button id="send-receipt">Send Email Receipt</button>
+            </div>
+            <div id="owner-summary" class="summary-cards"></div>
+
+            <div id="business-data">
+                <!-- Service Requests -->
+                <div class="section-header">
+                    <h3>Service Requests</h3>
+                    <select id="request-status-filter" aria-label="Filter requests by status">
+                        <option value="open">New &amp; Scheduled</option>
+                        <option value="all">All</option>
+                        <option value="new">New</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="done">Done</option>
+                    </select>
+                </div>
+                <div id="owner-requests"></div>
+
+                <!-- Service Logs -->
+                <div class="section-header">
+                    <h3>Recent Service Logs</h3>
+                </div>
+                <div class="filters">
+                    <select id="log-customer-filter" aria-label="Filter by customer">
+                        <option value="">All customers</option>
+                    </select>
+                    <select id="log-paid-filter" aria-label="Filter by payment">
+                        <option value="">Paid &amp; unpaid</option>
+                        <option value="unpaid">Unpaid only</option>
+                        <option value="pending">Customer says paid (confirm)</option>
+                        <option value="paid">Paid only</option>
+                    </select>
+                </div>
+                <div id="owner-logs"></div>
+
+                <!-- Customers -->
+                <div class="section-header">
+                    <h3>Customers</h3>
+                    <button id="add-customer-btn" class="secondary">Add Customer</button>
+                </div>
+                <div id="owner-customers"></div>
+
+                <!-- Payment Settings -->
+                <div class="section-header">
+                    <h3>Payment Settings</h3>
+                    <button id="toggle-payment-settings" class="secondary">Edit</button>
+                </div>
+                <p class="muted">Customers see these as Pay buttons on unpaid invoices. Leave any box empty to hide that option.</p>
+                <form id="payment-settings-form" class="card-form" style="display: none;">
+                    <label>Cash App $cashtag
+                        <input type="text" id="pay-cashtag" placeholder="$YourCashtag" maxlength="40">
+                    </label>
+                    <label>Zelle email or phone
+                        <input type="text" id="pay-zelle" placeholder="email or phone used for Zelle" maxlength="100">
+                    </label>
+                    <label>Chime $ChimeSign
+                        <input type="text" id="pay-chime" placeholder="$YourChimeSign" maxlength="40">
+                    </label>
+                    <label>Square payment link
+                        <input type="url" id="pay-square" placeholder="https://square.link/..." maxlength="300">
+                    </label>
+                    <div class="button-row">
+                        <button type="submit">Save Payment Settings</button>
+                    </div>
+                    <p id="payment-settings-message" class="success" role="status"></p>
+                    <p id="payment-settings-error" class="error" role="alert"></p>
+                </form>
+                <div id="payment-settings-summary"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Customer add/edit dialog -->
+    <div id="customer-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="customer-modal-title">
+        <div class="modal-content">
+            <h2 id="customer-modal-title">Add Customer</h2>
+            <form id="customer-form">
+                <label>Name
+                    <input type="text" id="cust-name" maxlength="100" required>
+                </label>
+                <label>Email
+                    <input type="email" id="cust-email" maxlength="200" required>
+                </label>
+                <p id="cust-email-note" class="muted" style="display: none;">Email can't be changed. To use a different email, add a new customer.</p>
+                <label>Phone
+                    <input type="tel" id="cust-phone" maxlength="40">
+                </label>
+                <label>Address
+                    <input type="text" id="cust-address" maxlength="200">
+                </label>
+                <label>Pool notes
+                    <textarea id="cust-notes" rows="3" maxlength="2000" placeholder="Pool size, equipment, gate code, dog in yard..."></textarea>
+                </label>
+                <div class="button-row">
+                    <button type="submit">Save Customer</button>
+                    <button type="button" class="secondary modal-close">Cancel</button>
+                </div>
+                <p id="customer-form-error" class="error" role="alert"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Service log dialog -->
+    <div id="log-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
+        <div class="modal-content">
+            <h2 id="log-modal-title">Log New Service</h2>
+            <form id="log-form">
+                <label>Customer
+                    <select id="log-customer" required></select>
+                </label>
+                <label>Date
+                    <input type="date" id="log-date" required>
+                </label>
+                <label>Service type
+                    <select id="log-type" required>
+                        <option value="Cleaning">Cleaning</option>
+                        <option value="Chemical Balance">Chemical Balance</option>
+                        <option value="Tile">Tile</option>
+                        <option value="Metal / Repair">Metal / Repair</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </label>
+                <fieldset>
+                    <legend>Chemical readings (optional)</legend>
+                    <div class="reading-row">
+                        <label>pH <input type="number" id="log-ph" step="0.1" min="0" max="14" inputmode="decimal"></label>
+                        <label>Chlorine (ppm) <input type="number" id="log-chlorine" step="0.1" min="0" inputmode="decimal"></label>
+                        <label>Alkalinity (ppm) <input type="number" id="log-alkalinity" step="1" min="0" inputmode="numeric"></label>
+                    </div>
+                </fieldset>
+                <label>Notes
+                    <textarea id="log-notes" rows="3" maxlength="2000"></textarea>
+                </label>
+                <label>Amount charged ($)
+                    <input type="number" id="log-amount" step="0.01" min="0" inputmode="decimal" required>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="log-paid"> Paid
+                </label>
+                <div class="button-row">
+                    <button type="submit">Save Service Log</button>
+                    <button type="button" class="secondary modal-close">Cancel</button>
+                </div>
+                <p id="log-form-error" class="error" role="alert"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Pick a log for a receipt -->
+    <div id="pick-log-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="pick-log-title">
+        <div class="modal-content">
+            <h2 id="pick-log-title">Send Email Receipt</h2>
+            <label>Choose a service log
+                <select id="pick-log-select"></select>
+            </label>
+            <div class="button-row">
+                <button id="pick-log-go">Show Receipt</button>
+                <button type="button" class="secondary modal-close">Cancel</button>
+            </div>
+            <p id="pick-log-error" class="error" role="alert"></p>
+        </div>
+    </div>
+
+    <!-- Receipt dialog (also what gets printed) -->
+    <div id="receipt-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-label="Receipt">
+        <div class="modal-content receipt-wrapper">
+            <div id="receipt-content" class="receipt"></div>
+            <div class="button-row no-print">
+                <button id="receipt-email-btn">Email to Customer</button>
+                <button id="receipt-print-btn" class="secondary">Print / Save as PDF</button>
+                <button type="button" class="secondary modal-close">Close</button>
+            </div>
+            <p id="receipt-note" class="muted no-print"></p>
+        </div>
+    </div>
+
+    <!-- Small pop-up message -->
+    <div id="toast" class="toast" role="status" aria-live="polite" style="display: none;"></div>
+
+    <!-- Firebase SDKs (Module format for modern web apps) -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
